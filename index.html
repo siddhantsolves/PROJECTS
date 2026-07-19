@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D WebGL Project Portals</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #07080f;
+            --card-active-glow: #06b6d4;
+            --glow-dark: #047a8f;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #111424 0%, #07080f 100%);
+            color: #ffffff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Particles Embers Background */
+        #particles-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Fluid Physics Neon Cursor Trail Overlay */
+        #trail-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        /* Top Title Header */
+        header {
+            width: 100%;
+            text-align: center;
+            padding: 20px 20px 10px 20px;
+            z-index: 10;
+        }
+        
+        header h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            letter-spacing: 6px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+        }
+
+        /* Portals Container */
+        .portals-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            height: 48vh;
+            padding: 0 10px;
+            z-index: 10;
+        }
+
+        /* Individual Skewed Portal */
+        .portal {
+            position: relative;
+            flex: 1;
+            height: 100%;
+            max-width: 170px;
+            margin: 0 10px;
+            overflow: hidden;
+            transform: skewX(-14deg);
+            border-radius: 6px;
+            cursor: pointer;
+            border-left: 2px solid var(--glow);
+            border-right: 2px solid var(--glow);
+            box-shadow: 0 0 15px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.8);
+            background: rgba(10, 12, 22, 0.4);
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s, filter 0.4s;
+            opacity: 0.85;
+        }
+
+        /* Color definitions mapped to projects */
+        .portal[data-color="red"] { --glow: #ef4444; }
+        .portal[data-color="cyan"] { --glow: #06b6d4; }
+        .portal[data-color="green"] { --glow: #22c55e; }
+        .portal[data-color="yellow"] { --glow: #eab308; }
+        .portal[data-color="blue"] { --glow: #3b82f6; }
+        .portal[data-color="orange"] { --glow: #f97316; }
+
+        /* Dynamic Grid Backdrop inside each Portal */
+        .portal-grid-bg {
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(0deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 15px 15px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Inner WebGL container (Counter-skewed to render straight) */
+        .portal-webgl-container {
+            width: 150%;
+            height: 100%;
+            position: absolute;
+            left: -25%;
+            transform: skewX(14deg);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .portal:hover {
+            transform: skewX(-14deg) scale(1.08) translateY(-8px);
+            opacity: 1 !important;
+            box-shadow: 0 0 30px var(--glow);
+            z-index: 20;
+        }
+
+        /* Overlay with visual gradient */
+        .portal-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(7, 8, 15, 0.95) 100%);
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        /* Text tag at bottom of portals */
+        .portal-tag {
+            position: absolute;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%) skewX(14deg);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 0 10px var(--glow);
+            letter-spacing: 2px;
+            text-align: center;
+            z-index: 4;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* Restructured Horizontal Control Deck */
+        .control-deck {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 40px 30px 40px;
+            z-index: 10;
+            background: linear-gradient(to top, rgba(7, 8, 15, 0.95), rgba(7, 8, 15, 0));
+            gap: 20px;
+        }
+
+        /* Left Side: Project Descriptions Panel */
+        .deck-left {
+            flex: 1;
+            max-width: 320px;
+            text-align: left;
+        }
+
+        #project-desc {
+            font-size: 1.05rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            letter-spacing: 0.5px;
+        }
+
+        /* Center Column: Viewport & 3D Text Title */
+        .deck-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: auto;
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 480px;
+            height: 480px;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* Dynamic 3D extruding title positioned safely lower */
+        #project-title {
+            margin-top: 130px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.6rem;
+            font-weight: 900;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            color: #ffffff;
+            transition: color 0.4s, text-shadow 0.4s;
+            text-shadow: 
+                1px 1px 0px var(--glow-dark),
+                2px 2px 0px var(--glow-dark),
+                3px 3px 0px var(--glow-dark),
+                4px 4px 0px var(--glow-dark),
+                5px 5px 0px var(--glow-dark),
+                0px 5px 15px var(--card-active-glow);
+        }
+
+        /* Futuristic HUD Hologram rings - Scaled up 3x and centered */
+        .radar-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 390px;
+            height: 390px;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotate(0deg);
+            animation: rotateRadar 20s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .radar-ring-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 300px;
+            height: 300px;
+            border: 2px solid var(--card-active-glow);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 1;
+            transition: border-color 0.5s;
+        }
+
+        @keyframes rotateRadar {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* Right Side: Interactive 3D Action Button container */
+        .deck-right {
+            flex: 1;
+            max-width: 320px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        /* Interactive 3D button */
+        .btn-3d {
+            position: relative;
+            display: inline-block;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-decoration: none;
+            color: #ffffff;
+            background: rgba(10, 12, 22, 0.6);
+            padding: 14px 22px;
+            border: 2px solid var(--card-active-glow);
+            border-radius: 4px;
+            box-shadow: 
+                0px 5px 0px var(--glow-dark),
+                0px 8px 15px rgba(0, 0, 0, 0.5),
+                inset 0 0 10px rgba(255, 255, 255, 0.05);
+            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+            cursor: pointer;
+            pointer-events: auto; /* Required to remain interactive */
+        }
+
+        .btn-3d:hover {
+            transform: translateY(2px);
+            box-shadow: 
+                0px 3px 0px var(--glow-dark),
+                0px 6px 10px rgba(0, 0, 0, 0.5);
+            background: var(--card-active-glow);
+            color: #07080f;
+        }
+
+        .btn-3d:active {
+            transform: translateY(5px);
+            box-shadow: 
+                0px 0px 0px var(--glow-dark),
+                0px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Responsive Layout adjustment */
+        @media (max-width: 768px) {
+            .portals-container {
+                flex-wrap: wrap;
+                height: auto;
+                gap: 15px;
+                padding-top: 15px;
+            }
+            .portal {
+                flex: none;
+                width: calc(50% - 20px);
+                height: 160px;
+                transform: skewX(-6deg);
+            }
+            .portal-webgl-container {
+                transform: skewX(6deg);
+                width: 120%;
+                left: -10%;
+            }
+            .portal:hover {
+                transform: skewX(-6deg) scale(1.04);
+            }
+            .portal-tag {
+                transform: translateX(-50%) skewX(6deg);
+                font-size: 10px;
+            }
+
+            /* Responsive 3-Column to single stack adjustments */
+            .control-deck {
+                flex-direction: column;
+                padding: 20px;
+                gap: 25px;
+                text-align: center;
+            }
+            .deck-left, .deck-right {
+                max-width: 100%;
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+            }
+            #project-desc {
+                text-align: center;
+            }
+            .deck-center {
+                order: -1; /* Keeps the 3D visual prioritized at top */
+            }
+            #project-title {
+                margin-top: 60px; /* Reduces space on condensed screens */
+                font-size: 1.6rem; /* Proportional scale-down for mobile view */
+            }
+
+            #canvas-container {
+                width: 280px;
+                height: 280px;
+            }
+            .radar-ring {
+                width: 228px;
+                height: 228px;
+            }
+            .radar-ring-inner {
+                width: 175px;
+                height: 175px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="particles-canvas"></canvas>
+    <canvas id="trail-canvas"></canvas> <!-- Canvas dedicated to Cursor Trail -->
+
+    <header>
+        <h2>Project Portals</h2>
+    </header>
+
+    <!-- Project Portals with live 3D webGL placeholders -->
+    <div class="portals-container">
+        <!-- 3D Engine -->
+        <div class="portal" data-index="0" data-color="red">
+            <div class="portal-grid-bg"></div>
+            <div class="portal-webgl-container" id="webgl-p0"></div>
+            <div class="portal-overlay"></div>
+            <div class="portal-tag">3D ENGINE</div>
+        </div>
+
+        <!-- Anim-Scene -->
+        <div class="portal" data-index="1" data-color="cyan">
+            <div class="portal-grid-bg"></div>
+            <div class="portal-webgl-container" id="webgl-p1"></div>
+            <div class="portal-overlay"></div>
+            <div class="portal-tag">ANIM-SCENE</div>
+        </div>
+
+        <!-- Model-Optimizer -->
+        <div class="portal" data-index="2" data-color="green">
+            <div class="portal-grid-bg"></div>
+            <div class="portal-webgl-container" id="webgl-p2"></div>
+            <div class="portal-overlay"></div>
+            <div class="portal-tag">OPTIMIZER</div>
+        </div>
+
+        <!-- Depth-Maker -->
+        <div class="portal" data-index="3" data-color="yellow">
+            <div class="portal-grid-bg"></div>
+            <div class="portal-webgl-container" id="webgl-p3"></div>
+            <div class="portal-overlay"></div>
+            <div class="portal-tag">DEPTH-MAKER</div>
+        </div>
+
+        <!-- Half-3d -->
+        <div class="portal" data-index="4" data-color="blue">
+            <div class="portal-grid-bg"></div>
+            <div class="portal-webgl-container" id="webgl-p4"></div>
+            <div class="portal-overlay"></div>
+            <div class="portal-tag">HALF-3D</div>
+        </div>
+
+        <!-- Imotion -->
+        <div class="portal" data-index="5" data-color="orange">
+            <div class="portal-grid-bg"></div>
+            <div class="portal-webgl-container" id="webgl-p5"></div>
+            <div class="portal-overlay"></div>
+            <div class="portal-tag">IMOTION</div>
+        </div>
+    </div>
+
+    <!-- Interactive Lower Console Panel structured horizontally -->
+    <div class="control-deck">
+        <div class="deck-left">
+            <p id="project-desc">Hover over any portal above to interact with the project and view its rendering architecture.</p>
+        </div>
+        
+        <div class="deck-center">
+            <div class="canvas-wrapper">
+                <div class="radar-ring"></div>
+                <div class="radar-ring-inner" id="inner-hud-ring"></div>
+                <div id="canvas-container"></div>
+            </div>
+            <h1 id="project-title">SELECT A PORTAL</h1>
+        </div>
+
+        <div class="deck-right">
+            <a href="https://siddhantsolves.github.io/VOID-of-MEMORIES/" target="_blank" class="btn-3d">Void of Memories</a>
+        </div>
+    </div>
+
+    <!-- External Libraries CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <script>
+        // Projects Configuration Data
+        const projectsData = [
+            {
+                title: "3D Engine",
+                desc: "A custom 3D renderer and game engine built entirely on HTML, CSS, and JS. Extremely lightweight and optimized to run on resource-limited screens.",
+                color: "#ef4444"
+            },
+            {
+                title: "Anim-Scene",
+                desc: "An intuitive 3D cinematic scene builder that compiles and operates locally on your machine using modern web services, Three.js, and raw WebGL.",
+                color: "#06b6d4"
+            },
+            {
+                title: "Model-Optimizer",
+                desc: "A mesh decimation utility designed to decrease file sizes of 3D models while preserving material maps and coordinate precision.",
+                color: "#22c55e"
+            },
+            {
+                title: "Depth-Maker",
+                desc: "A production utility used to compute custom high-fidelity grayscale depth values directly from standard 2D flat image sources.",
+                color: "#eab308"
+            },
+            {
+                title: "Half-3d",
+                desc: "A dimensional parallax layout generator designed to turn static images into responsive 2.5D visual layers using custom depth coordinates.",
+                color: "#3b82f6"
+            },
+            {
+                title: "Imotion",
+                desc: "A media transformation interface that executes lightning-fast calculations to map conversions between video segments, frames, and custom GIF loops.",
+                color: "#f97316"
+            }
+        ];
+
+        let activeEmberColor = '#06b6d4';
+        const miniScenes = []; // Stores scene metadata for portals
+        const rotationSpeedFactors = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]; // Accelerates speed on hover
+
+        // Adjust base Y vertical coordinate of happy.glb
+        const modelBaseY = -0.95;
+
+        // Dynamic luminance calculator for dynamic 3D text-shadow layers
+        function adjustColorBrightness(hex, percent) {
+            let num = parseInt(hex.replace("#",""), 16),
+            amt = Math.round(2.55 * percent),
+            R = (num >> 16) + amt,
+            G = (num >> 8 & 0x00FF) + amt,
+            B = (num & 0x0000FF) + amt;
+            return "#" + (0x1000000 + (R<255?R<0?0:R:255)*0x10000 + (G<255?G<0?0:G:255)*0x100 + (B<255?B<0?0:B:255)).toString(16).slice(1);
+        }
+
+        // --- PART I: BACKGROUND EMBER ENGINE ---
+        const canvas = document.getElementById('particles-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + Math.random() * 80;
+                this.size = Math.random() * 2 + 0.8;
+                this.speedY = Math.random() * -1.2 - 0.4;
+                this.speedX = Math.random() * 1.0 - 0.5;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.005 + 0.002;
+                
+                const baseColors = ['#ef4444', '#f97316', '#3b82f6', '#06b6d4'];
+                this.color = Math.random() > 0.5 ? activeEmberColor : baseColors[Math.floor(Math.random() * baseColors.length)];
+            }
+            update() {
+                this.y += this.speedY;
+                this.x += this.speedX;
+                this.alpha -= this.decay;
+                if (this.alpha <= 0) this.reset();
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        for (let i = 0; i < 50; i++) particles.push(new Particle());
+
+
+        // --- PART II: PORTALS WEBGL INITIALIZATION ---
+        function initMiniScene(containerId, index, colorHex) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const scene = new THREE.Scene();
+            
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10);
+            camera.position.z = 2.6;
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            container.appendChild(renderer.domElement);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambient);
+            
+            const point = new THREE.PointLight(colorHex, 2.0, 5);
+            point.position.set(0, 1.5, 1.5);
+            scene.add(point);
+
+            const group = new THREE.Group();
+            scene.add(group);
+
+            let customData = {};
+
+            // Render procedural objects matching each specific project theme
+            if (index === 0) {
+                // 3D Engine: Octahedron cage rotating around solid core
+                const outer = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(0.55, 1),
+                    new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true })
+                );
+                const inner = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.24, 16, 16),
+                    new THREE.MeshPhongMaterial({ color: 0xff3333, emissive: 0x440000, shininess: 80 })
+                );
+                group.add(outer, inner);
+            } 
+            else if (index === 1) {
+                // Anim-Scene: Orbital camera paths with connecting lines
+                const center = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.2, 16, 16),
+                    new THREE.MeshPhongMaterial({ color: colorHex, emissive: 0x003344, shininess: 80 })
+                );
+                group.add(center);
+
+                const orbitGroup = new THREE.Group();
+                const nodeGeom = new THREE.SphereGeometry(0.06, 8, 8);
+                const nodeMat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+                for (let i = 0; i < 3; i++) {
+                    const node = new THREE.Mesh(nodeGeom, nodeMat);
+                    const radius = 0.5;
+                    const angle = (i / 3) * Math.PI * 2;
+                    node.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+                    orbitGroup.add(node);
+
+                    // Add Orbit Line visual
+                    const orbitRing = new THREE.Mesh(
+                        new THREE.RingGeometry(radius - 0.01, radius + 0.01, 32),
+                        new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: 0.15 })
+                    );
+                    orbitRing.rotation.x = (Math.PI / 4) * (i + 1);
+                    orbitRing.rotation.y = (Math.PI / 6) * (i + 1);
+                    group.add(orbitRing);
+                }
+                group.add(orbitGroup);
+            } 
+            else if (index === 2) {
+                // Model-Optimizer: Torus knot morphing between high-poly and low-poly decimation
+                const high = new THREE.Mesh(
+                    new THREE.TorusKnotGeometry(0.35, 0.12, 60, 10),
+                    new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true, transparent: true, opacity: 1.0 })
+                );
+                const low = new THREE.Mesh(
+                    new THREE.TorusKnotGeometry(0.35, 0.12, 10, 3),
+                    new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true, transparent: true, opacity: 0.0 })
+                );
+                group.add(high, low);
+            } 
+            else if (index === 3) {
+                // Depth-Maker: Procedural heightfield mesh representing spatial layout terrain
+                const gridGeom = new THREE.PlaneGeometry(1.0, 1.0, 12, 12);
+                const gridMesh = new THREE.Mesh(
+                    gridGeom,
+                    new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true, side: THREE.DoubleSide })
+                );
+                gridMesh.rotation.x = -Math.PI / 3;
+                group.add(gridMesh);
+                customData.gridGeom = gridGeom;
+            } 
+            else if (index === 4) {
+                // Half-3D: Multi-layer projection frames visualising parallax depth
+                const layers = new THREE.Group();
+                const back = new THREE.Mesh(
+                    new THREE.PlaneGeometry(0.8, 0.8, 4, 4),
+                    new THREE.MeshBasicMaterial({ color: 0x1d4ed8, wireframe: true, transparent: true, opacity: 0.4 })
+                );
+                back.position.z = -0.22;
+                const front = new THREE.Mesh(
+                    new THREE.PlaneGeometry(0.8, 0.8, 4, 4),
+                    new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true })
+                );
+                front.position.z = 0.22;
+                layers.add(back, front);
+
+                // Projection linking lines
+                const lineMat = new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.25 });
+                const fPos = front.geometry.attributes.position;
+                const bPos = back.geometry.attributes.position;
+                for (let i = 0; i < fPos.count; i += 2) {
+                    const pts = [
+                        new THREE.Vector3(fPos.getX(i), fPos.getY(i), 0.22),
+                        new THREE.Vector3(bPos.getX(i), bPos.getY(i), -0.22)
+                    ];
+                    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
+                    layers.add(line);
+                }
+                group.add(layers);
+            } 
+            else if (index === 5) {
+                // Imotion: Converted gyroscope representing continuous rotation translation
+                const g1 = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.025, 8, 24), new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true }));
+                const g2 = new THREE.Mesh(new THREE.TorusGeometry(0.40, 0.025, 8, 24), new THREE.MeshBasicMaterial({ color: colorHex, wireframe: true }));
+                const g3 = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.3, 4), new THREE.MeshPhongMaterial({ color: 0xffa040, emissive: 0x331100 }));
+                g3.rotation.x = Math.PI / 2;
+                group.add(g1, g2, g3);
+            }
+
+            miniScenes.push({
+                scene, camera, renderer, group, index, customData
+            });
+        }
+
+        // Initialize WebGL scenes inside all cards
+        projectsData.forEach((project, idx) => {
+            initMiniScene(`webgl-p${idx}`, idx, project.color);
+        });
+
+
+        // --- PART III: CENTRAL PRIMARY VIEWER (happy.glb / Fallback) ---
+        const mainContainer = document.getElementById('canvas-container');
+        const mainScene = new THREE.Scene();
+        
+        const mainCamera = new THREE.PerspectiveCamera(45, mainContainer.clientWidth / mainContainer.clientHeight, 0.1, 100);
+        mainCamera.position.z = 4.2;
+
+        const mainRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        mainRenderer.setSize(mainContainer.clientWidth, mainContainer.clientHeight);
+        mainRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        mainContainer.appendChild(mainRenderer.domElement);
+
+        // Lights
+        const mainAmbient = new THREE.AmbientLight(0xffffff, 0.45);
+        mainScene.add(mainAmbient);
+
+        const mainPoint = new THREE.PointLight(0x06b6d4, 1.8, 12);
+        mainPoint.position.set(0, 1.5, 2.5);
+        mainScene.add(mainPoint);
+
+        const mainDirect = new THREE.DirectionalLight(0xffffff, 1.2);
+        mainDirect.position.set(1, 3, 2);
+        mainScene.add(mainDirect);
+
+        let mainMixer;
+        let mainModel;
+        const mainClock = new THREE.Clock();
+
+        let mouseX = 0, mouseY = 0;
+        let rawMouseX = window.innerWidth / 2;
+        let rawMouseY = window.innerHeight / 2;
+
+        // Load primary GLB model
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+            'happy.glb',
+            (gltf) => {
+                mainModel = gltf.scene;
+                mainScene.add(mainModel);
+
+                const box = new THREE.Box3().setFromObject(mainModel);
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 2.4 / maxDim; 
+                mainModel.scale.set(scale, scale, scale);
+
+                const center = box.getCenter(new THREE.Vector3());
+                mainModel.position.sub(center.multiplyScalar(scale));
+                mainModel.position.y = modelBaseY;
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    mainMixer = new THREE.AnimationMixer(mainModel);
+                    const action = mainMixer.clipAction(gltf.animations[0]);
+                    action.play();
+                }
+            },
+            undefined,
+            (error) => {
+                // Holographic wireframe geometry fallback if file not found locally
+                const geometry = new THREE.TorusKnotGeometry(0.7, 0.22, 120, 12);
+                const material = new THREE.MeshPhysicalMaterial({
+                    color: 0x06b6d4,
+                    wireframe: true,
+                    roughness: 0.2,
+                    metalness: 0.9,
+                    clearcoat: 1.0
+                });
+                mainModel = new THREE.Mesh(geometry, material);
+                mainScene.add(mainModel);
+            }
+        );
+
+        window.addEventListener('resize', () => {
+            // Resize main
+            const mainW = mainContainer.clientWidth;
+            const mainH = mainContainer.clientHeight;
+            mainCamera.aspect = mainW / mainH;
+            mainCamera.updateProjectionMatrix();
+            mainRenderer.setSize(mainW, mainH);
+
+            // Resize portal webGL spaces
+            miniScenes.forEach(m => {
+                const pContainer = document.getElementById(`webgl-p${m.index}`);
+                if (pContainer) {
+                    m.camera.aspect = pContainer.clientWidth / pContainer.clientHeight;
+                    m.camera.updateProjectionMatrix();
+                    m.renderer.setSize(pContainer.clientWidth, pContainer.clientHeight);
+                }
+            });
+        });
+
+
+        // --- PART IV: FLUID PHYSICS MOUSE TRAIL & EMBER KINETICS ---
+        const trailCanvas = document.getElementById('trail-canvas');
+        const trailCtx = trailCanvas.getContext('2d');
+        
+        // Setup spring chain node configuration
+        const numNodes = 20;
+        const trailNodes = [];
+        for (let i = 0; i < numNodes; i++) {
+            trailNodes.push({ x: rawMouseX, y: rawMouseY, vx: 0, vy: 0 });
+        }
+
+        let targetMouse = { x: rawMouseX, y: rawMouseY };
+        let mouseMovedOnce = false;
+
+        // Spark / kinetic dust particle structure
+        let sparks = [];
+        class Spark {
+            constructor(x, y, vx, vy, color) {
+                this.x = x;
+                this.y = y;
+                // Emit trailing opposite kinetic vector with light noise
+                this.vx = vx + (Math.random() - 0.5) * 2.5;
+                this.vy = vy + (Math.random() - 0.5) * 2.5;
+                this.life = 1.0;
+                this.decay = 0.02 + Math.random() * 0.025;
+                this.size = 1.2 + Math.random() * 2.2;
+                this.color = color;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.04; // Light gravity simulation
+                this.life -= this.decay;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function resizeTrailCanvas() {
+            trailCanvas.width = window.innerWidth;
+            trailCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeTrailCanvas);
+        resizeTrailCanvas();
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+            targetMouse.x = e.clientX;
+            targetMouse.y = e.clientY;
+
+            // Align all spring-chain coordinates to cursor position on first initialization
+            if (!mouseMovedOnce) {
+                for (let i = 0; i < numNodes; i++) {
+                    trailNodes[i].x = e.clientX;
+                    trailNodes[i].y = e.clientY;
+                }
+                mouseMovedOnce = true;
+            }
+
+            // Calculate directional velocity to spawn kinetic ambient embers
+            const distanceMoved = Math.hypot(e.clientX - trailNodes[0].x, e.clientY - trailNodes[0].y);
+            if (distanceMoved > 4 && sparks.length < 120) {
+                const sparksToEmit = Math.min(Math.floor(distanceMoved / 5), 4);
+                for (let i = 0; i < sparksToEmit; i++) {
+                    sparks.push(new Spark(
+                        e.clientX, 
+                        e.clientY, 
+                        (trailNodes[0].x - e.clientX) * -0.12, 
+                        (trailNodes[0].y - e.clientY) * -0.12, 
+                        activeEmberColor
+                    ));
+                }
+            }
+        });
+
+        // Renders physical spring chain using screen additive blend mode
+        function updateAndDrawTrail() {
+            trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+            
+            if (!mouseMovedOnce) return;
+
+            // 1. Calculate Chain Spring Forces
+            trailNodes[0].x += (targetMouse.x - trailNodes[0].x) * 0.75;
+            trailNodes[0].y += (targetMouse.y - trailNodes[0].y) * 0.75;
+
+            const springStrength = 0.44;
+            const frictionCoefficient = 0.54;
+
+            for (let i = 1; i < numNodes; i++) {
+                const prevNode = trailNodes[i - 1];
+                const currNode = trailNodes[i];
+                
+                currNode.vx += (prevNode.x - currNode.x) * springStrength;
+                currNode.vy += (prevNode.y - currNode.y) * springStrength;
+                currNode.vx *= frictionCoefficient;
+                currNode.vy *= frictionCoefficient;
+                
+                currNode.x += currNode.vx;
+                currNode.y += currNode.vy;
+            }
+
+            // 2. Render Sparks
+            sparks.forEach(s => s.update());
+            sparks = sparks.filter(s => s.life > 0);
+            sparks.forEach(s => s.draw(trailCtx));
+
+            // 3. Render Volumetric Physics Ribbon
+            trailCtx.save();
+            trailCtx.lineCap = 'round';
+            trailCtx.lineJoin = 'round';
+            // Enable additive screenspace blend mode
+            trailCtx.globalCompositeOperation = 'screen';
+
+            // Pass 1: Diffuse Outer Glow
+            for (let i = 1; i < numNodes; i++) {
+                const p1 = trailNodes[i - 1];
+                const p2 = trailNodes[i];
+                
+                const taperRatio = (numNodes - i) / numNodes; 
+                const opacity = taperRatio * 0.45;
+                const width = taperRatio * 14.5 + 1.2;
+
+                trailCtx.beginPath();
+                trailCtx.moveTo(p1.x, p1.y);
+                trailCtx.lineTo(p2.x, p2.y);
+                trailCtx.strokeStyle = activeEmberColor;
+                trailCtx.globalAlpha = opacity;
+                trailCtx.lineWidth = width;
+                trailCtx.stroke();
+            }
+
+            // Pass 2: High Intensity Hot Core
+            for (let i = 1; i < numNodes; i++) {
+                const p1 = trailNodes[i - 1];
+                const p2 = trailNodes[i];
+                
+                const taperRatio = (numNodes - i) / numNodes;
+                const opacity = taperRatio * 0.9;
+                const width = taperRatio * 4.2 + 0.6;
+
+                trailCtx.beginPath();
+                trailCtx.moveTo(p1.x, p1.y);
+                trailCtx.lineTo(p2.x, p2.y);
+                trailCtx.strokeStyle = "#ffffff";
+                trailCtx.globalAlpha = opacity;
+                trailCtx.lineWidth = width;
+                trailCtx.stroke();
+            }
+
+            trailCtx.restore();
+        }
+
+
+        // --- PART V: GLOBAL UNIFIED TICK LOOP ---
+        function globalTick() {
+            requestAnimationFrame(globalTick);
+
+            // 1. Update Canvas Embers
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            // 2. Update Interactive Cursor Trail
+            updateAndDrawTrail();
+
+            // 3. Update Primary Central Viewer
+            const mainDelta = mainClock.getDelta();
+            if (mainMixer) mainMixer.update(mainDelta);
+            if (mainModel) {
+                const targetRotY = mouseX * 0.45;
+                const targetRotX = -mouseY * 0.35;
+                mainModel.rotation.y += (targetRotY - mainModel.rotation.y) * 0.08;
+                mainModel.rotation.x += (targetRotX - mainModel.rotation.x) * 0.08;
+
+                // Adjust horizontal/vertical oscillation smoothly relative to the base coordinate
+                const targetY = (Math.abs(mouseX) < 0.1 && Math.abs(mouseY) < 0.1) 
+                    ? (modelBaseY + Math.sin(Date.now() * 0.002) * 0.06) 
+                    : modelBaseY;
+                
+                mainModel.position.y += (targetY - mainModel.position.y) * 0.08;
+
+                if (Math.abs(mouseX) < 0.1 && Math.abs(mouseY) < 0.1) {
+                    mainModel.rotation.y += 0.005;
+                }
+            }
+            mainRenderer.render(mainScene, mainCamera);
+
+            // 4. Update Portal WebGL Containers
+            miniScenes.forEach(m => {
+                const speed = rotationSpeedFactors[m.index];
+                const group = m.group;
+
+                if (m.index === 0) {
+                    // Octahedron core rotation
+                    group.children[0].rotation.y += 0.008 * speed;
+                    group.children[0].rotation.x += 0.004 * speed;
+                    group.children[1].rotation.y -= 0.003 * speed;
+                } 
+                else if (m.index === 1) {
+                    // Orbital nodes rotation
+                    group.children[1].rotation.z += 0.008 * speed;
+                    group.children[1].rotation.x += 0.004 * speed;
+                } 
+                else if (m.index === 2) {
+                    // Decimation mesh cross-fade animation loop
+                    const fade = (Math.sin(Date.now() * 0.002) + 1) / 2;
+                    group.children[0].material.opacity = fade;
+                    group.children[1].material.opacity = 1 - fade;
+                    group.rotation.y += 0.012 * speed;
+                    group.rotation.x += 0.006 * speed;
+                } 
+                else if (m.index === 3) {
+                    // Depth Map terrain calculations
+                    const pos = m.customData.gridGeom.attributes.position;
+                    const time = Date.now() * 0.0025;
+                    for (let i = 0; i < pos.count; i++) {
+                        const x = pos.getX(i);
+                        const y = pos.getY(i);
+                        const z = Math.sin(x * 4.0 + time) * Math.cos(y * 4.0 + time) * 0.12;
+                        pos.setZ(i, z);
+                    }
+                    pos.needsUpdate = true;
+                    group.rotation.z += 0.002 * speed;
+                } 
+                else if (m.index === 4) {
+                    // Parallax card wobble movement
+                    group.children[0].rotation.y = Math.sin(Date.now() * 0.0012) * 0.25 * speed;
+                    group.children[0].rotation.x = Math.cos(Date.now() * 0.001) * 0.12 * speed;
+                } 
+                else if (m.index === 5) {
+                    // Nested gyroscopic rotations
+                    group.children[0].rotation.x += 0.012 * speed;
+                    group.children[0].rotation.y += 0.004 * speed;
+                    group.children[1].rotation.y -= 0.015 * speed;
+                    group.children[1].rotation.z += 0.008 * speed;
+                    group.children[2].rotation.z += 0.02 * speed;
+                }
+
+                m.renderer.render(m.scene, m.camera);
+            });
+        }
+        globalTick();
+
+
+        // --- PART VI: EVENT INTERACTION TRIGGERS ---
+        const portals = document.querySelectorAll('.portal');
+        const projectTitle = document.getElementById('project-title');
+        const projectDesc = document.getElementById('project-desc');
+        const innerHUD = document.getElementById('inner-hud-ring');
+
+        portals.forEach(portal => {
+            portal.addEventListener('mouseenter', () => {
+                const idx = parseInt(portal.getAttribute('data-index'));
+                const project = projectsData[idx];
+
+                activeEmberColor = project.color;
+
+                // Dim unhovered portals, keep active saturated
+                portals.forEach(p => {
+                    if (p !== portal) {
+                        gsap.to(p, { opacity: 0.15, filter: 'grayscale(70%)', duration: 0.4 });
+                    } else {
+                        gsap.to(p, { opacity: 1, filter: 'grayscale(0%)', duration: 0.4 });
+                    }
+                });
+
+                // Accelerate 3D rotation speed factor and scale active group slightly
+                gsap.to(rotationSpeedFactors, { [idx]: 2.6, duration: 0.4 });
+                const matchingScene = miniScenes.find(m => m.index === idx);
+                if (matchingScene) {
+                    gsap.to(matchingScene.group.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.4 });
+                }
+
+                // Update text interface elements
+                gsap.killTweensOf([projectTitle, projectDesc]);
+                
+                // Calculate dynamic dark shadow colors matching the hovered theme
+                const darkColor = adjustColorBrightness(project.color, -50);
+
+                gsap.timeline()
+                    .to([projectTitle, projectDesc], { opacity: 0, y: -8, duration: 0.15, ease: 'power2.in', onComplete: () => {
+                        projectTitle.textContent = project.title;
+                        
+                        // Apply dynamic CSS variables for 3D text layers and button shadows
+                        document.documentElement.style.setProperty('--card-active-glow', project.color);
+                        document.documentElement.style.setProperty('--glow-dark', darkColor);
+                        
+                        projectDesc.textContent = project.desc;
+                        innerHUD.style.borderColor = project.color;
+                    }})
+                    .to([projectTitle, projectDesc], { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
+
+                // Smoothly update spotlight to match active card color scheme
+                if (mainPoint) {
+                    gsap.to(mainPoint.color, {
+                        r: parseInt(project.color.substring(1,3), 16) / 255,
+                        g: parseInt(project.color.substring(3,5), 16) / 255,
+                        b: parseInt(project.color.substring(5,7), 16) / 255,
+                        duration: 0.6
+                    });
+                }
+
+                // If executing fallback placeholder, align central node color map
+                if (mainModel && mainModel.material && !mainModel.material.isGLTFMaterial) {
+                    gsap.to(mainModel.material.color, {
+                        r: parseInt(project.color.substring(1,3), 16) / 255,
+                        g: parseInt(project.color.substring(3,5), 16) / 255,
+                        b: parseInt(project.color.substring(5,7), 16) / 255,
+                        duration: 0.6
+                    });
+                    gsap.to(mainModel.material.emissive, {
+                        r: parseInt(project.color.substring(1,3), 16) / 255,
+                        g: parseInt(project.color.substring(3,5), 16) / 255,
+                        b: parseInt(project.color.substring(5,7), 16) / 255,
+                        duration: 0.6
+                    });
+                }
+            });
+
+            portal.addEventListener('mouseleave', () => {
+                const idx = parseInt(portal.getAttribute('data-index'));
+
+                // Restore rotation velocity baseline speeds and geometry scales
+                gsap.to(rotationSpeedFactors, { [idx]: 1.0, duration: 0.5 });
+                const matchingScene = miniScenes.find(m => m.index === idx);
+                if (matchingScene) {
+                    gsap.to(matchingScene.group.scale, { x: 1.0, y: 1.0, z: 1.0, duration: 0.5 });
+                }
+
+                // Reset opacity layers to normal
+                portals.forEach(p => {
+                    gsap.to(p, { opacity: 0.85, filter: 'grayscale(0%)', duration: 0.4 });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
